@@ -1,0 +1,55 @@
+body {
+	background-color: #000;
+	margin: 0;
+	padding: 0;
+}
+
+div#prelude {
+	width: 100%;
+	height: 100vh;
+	display: table;
+}
+
+div#prelude h1, div#prelude h2 {
+	color: white;
+}
+
+h2#statusDisplay {
+	margin: 1rem;
+}
+
+div#prelude .flex-container{
+	display: table-cell;
+	vertical-align: middle;
+
+}
+
+div#prelude .flex-container * {
+	align-items: center;
+}
+
+div#step-1 input, div#step-2 input, div#step-3 input {
+	display: block;
+	margin: 2rem auto;
+	width: 20rem;
+}
+
+div#step-1 button, div#step-2 button, div#step-3 button {
+	display: block;
+	margin: 2rem auto;
+}
+
+
+div#canvas-container {
+	display: none;
+}
+
+div#canvas-container canvas{
+	display: block;
+	margin: 0.5rem auto;
+}
+
+button#selectStone1, button#selectStone2 {
+	display: none;
+	margin: 0 auto;
+}

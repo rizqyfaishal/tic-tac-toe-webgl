@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title>Game Catur Jawa</title>
+	<link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+	<link rel="stylesheet" type="text/css" href="css/bootstrap-grid.min.css">
+	<link rel="stylesheet" type="text/css" href="css/bootstrap-reboot.min.css">
+	<link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+	<div id="prelude">
+		<div class="flex-container" id="step-1">
+			<h1 class="text-center">Tic Tac Toe</h1>
+			<button id="startButton" class="btn btn-success btn-center">Mulai Game</button>
+		</div>
+		<div class="flex-container" id="step-2" style="display: none;">
+			<h1 class="text-center">Player 1</h1>
+			<input type="text" class="form-control" placeholder="Player 1" id="player-1-name">
+			<button id="nextToPlayer2" class="btn btn-success btn-center">Lanjut</button>
+		</div>
+		<div class="flex-container" id="step-3" style="display: none;">
+			<h1 class="text-center">Player 2</h1>
+			<input type="text" class="form-control" placeholder="Player 2" id="player-2-name">
+			<button id="startGame" class="btn btn-success btn-center">Mulai Gan</button>
+		</div>
+	</div>
+	<div id="canvas-container">
+		<canvas id="gl-canvas" width="600" height="500">
+			Oops ... your browser doesn't support the HTML5 canvas element
+		</canvas>
+		<div>
+			<h2 class="text-center" id="statusDisplay"></h2>
+			<button id="selectStone1" class="btn btn-success btn-center">Pilih</button>
+			<button id="selectStone2" class="btn btn-success btn-center">Pilih</button>
+		</div>
+	</div>
+	<script src="js/jquery-3.3.1.min.js"></script>
+	<script type="text/javascript" src="js/bootstrap.bundle.min.js"></script>
+	<script id="vertex-shader" type="x-shader/x-vertex">
+      attribute vec4 vPosition;
+      attribute vec4 vColor;
+      attribute float vSize;
+      
+      varying vec4 fColor;
+      
+      void
+      main()
+      {
+          gl_Position = vPosition;
+          gl_PointSize = vSize;
+          fColor = vColor;
+      }
+   </script>
+	<script id="fragment-shader" type="x-shader/x-fragment">
+		precision mediump float;
+
+		void
+		main()
+		{
+		    gl_FragColor = vec4( 1.0, 1.0, 0.0, 1.0 );
+		}
+	</script>
+	<script type="text/javascript" src="Common/webgl-utils.js"></script>
+	<script type="text/javascript" src="Common/initShaders.js"></script>
+	<script type="text/javascript" src="Common/MV.js"></script>
+	<script type="text/javascript" src="script.js"></script>
+</body>
+</html>
