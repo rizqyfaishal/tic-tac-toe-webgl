@@ -46,7 +46,6 @@ div#canvas-container {
 
 div#canvas-container canvas{
 	display: block;
-	margin: 0.5rem auto;
 }
 
 button#selectStone1, button#selectStone2 {

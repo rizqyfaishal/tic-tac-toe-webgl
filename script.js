@@ -28,8 +28,48 @@ var currentSelectedStone = -1;
 var cBufferId, bufferId, sizeBufferId;
 var canvasOffsetTop, canvasOffsetLeft;
 var totalIndex = 0;
-
 var statusDisplay;
+
+var movement = 1;
+var scaleFactor = 0.005;
+var currentScale = 0.005;
+var currentPosition = 0;
+var targetPosition = 0;
+var scale = [1.0, 1.0];
+
+var matrixLocation;
+
+function scalePiece(start, count) {
+	currentScale += scaleFactor;
+	if(currentScale > 1.5) {
+		currentScale = 1.5;
+		scaleFactor = -1*scaleFactor;
+	}
+	if(currentScale < 0.05) {
+		currentScale = 0.05;
+		scaleFactor = -1*scaleFactor;
+	}
+	var matrix = m3.identity();
+	var projectionMatrix = m3.projection(canvas.width, canvas.height);
+	var scaleMatrix = m3.scaling(scale[0] + currentScale, scale[1] + currentScale);
+	matrix = m3.multiply(matrix, projectionMatrix);
+	matrix = m3.multiply(matrix, scaleMatrix);
+
+	gl.uniformMatrix3fv(matrixLocation, false, matrix);
+	gl.drawArrays( gl.TRIANGLES, start, count );
+	requestAnimationFrame(scalePiece);
+}
+
+function rotatePiece() {
+	requestAnimation(rotatePiece);
+}
+
+
+function translatePiece(x, y, count) {
+	var matrix = m3.identity();
+
+	requestAnimation(translatePiece);
+}
 
 var m3 = { 						//setup 3x3 transformation matrix object
    identity: function() {
@@ -116,12 +156,12 @@ function checkWinner(lastPlayer) {
 	var PLAYER_NUM = lastPlayer;
 	var lastStep = playerLastStep[PLAYER_NUM][1];
 	var isWin = false;
-	console.log(lastStep);
 	if(stateOfGames[lastStep] == PLAYER_NUM) {
 		if([1, 4, 7].indexOf(lastStep) != -1) {
 			isWin = isWin || (stateOfGames[lastStep-1] == stateOfGames[lastStep] 
 				&& stateOfGames[lastStep+1] == stateOfGames[lastStep]);
 		} else if([0, 3, 6].indexOf(lastStep) != -1) {
+			// console.log(lastStep);
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep+1] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+2]);
 		} else {
@@ -133,8 +173,10 @@ function checkWinner(lastPlayer) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep+3] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+6]);
 		} else if([3, 4, 5].indexOf(lastStep) != -1) {
+			console.log(lastStep);
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-3] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+3]);
+			console.log(isWin);
 		} else {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-3] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep-6]);
@@ -148,16 +190,17 @@ function checkWinner(lastPlayer) {
 		} else if(lastStep == 0) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep+4] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+8]);
-		} else if(lastStep = 2) {
+		} else if(lastStep == 2) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep+2] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+4]);
-		} else if(lastStep = 6) {
+		} else if(lastStep == 6) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-2] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep=4]);
 		} else if(lastStep == 8) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-4] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep-8]);
 		}
+		console.log(isWin);
 		return isWin;
 	}
 }
@@ -249,7 +292,8 @@ window.onload = function() {
 	canvasWidth = canvas.width;
 	canvasHeight = canvas.height;
 	canvasOffsetTop = canvas.offsetTop;
-	canvasOffsetLeft =  canvas.offsetLeft;
+	canvasOffsetLeft =  (window.innerWidth - canvasWidth) / 2;
+	$(canvas).css({ 'margin-left': canvasOffsetLeft });
 	gl.viewport(0, 0, canvas.width, canvas.height);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
@@ -263,6 +307,9 @@ window.onload = function() {
     var vPos = gl.getAttribLocation( program, "vPosition" );
     gl.vertexAttribPointer( vPos, 2, gl.FLOAT, false, 0, 0 );
     gl.enableVertexAttribArray( vPos );
+
+    matrixLocation = gl.getUniformLocation(program, "u_matrix");
+
 
     cBufferId = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, cBufferId );
@@ -376,9 +423,50 @@ function putStoneState(event) {
 	var stateIndex = getIndexStateOfGame(mousePoint[0], mousePoint[1]);
 	var temp = putStone(stateIndex, currentPlayer);
 	if(temp) {
-		renderStateOfGame(0);
+		var total = renderStateOfGame(0);
+		var start = total;
 		if(checkWinner(currentPlayer)) {
 			$(statusDisplay).html(playerNames[currentPlayer] + ' Menang!!!');
+			for(var i = 0;i<stateOfGames.length;i++) {
+				if(stateOfGames[i] == currentPlayer) {
+					if(playerSelectedStone[currentPlayer] == CIRCLE_STONE) {
+						var x;
+						var y;
+						x = -0.5 - 0.2 + (i%3)*0.5 + (i % 3)*0.2;
+						if(i>=0 && i<=2) {
+							y = 0.5 + 0.2;
+						} else if(i >= 3 && i <= 5) {
+							y = 0;
+						} else {
+							y = -0.5 - 0.2;
+						}
+						var count = 0;
+						var radius = 0.4;
+						radius = radius * 0.5;
+						// gl.clear(gl.COLOR_BUFFER_BIT);
+						var points = [];
+						var numPoints = 1000;
+						for (var i = 0; i < numPoints; i++){
+						    points.push(vec2(x +
+						        radius*Math.cos(i*2*Math.PI/numPoints),
+						        y + radius*Math.sin(i*2*Math.PI/numPoints) 
+						    ));
+						}
+
+						for(var i = 0;i<points.length;i++) {
+							gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+							gl.bufferSubData(gl.ARRAY_BUFFER, total*8.0, flatten(points[i]));
+							total++;
+							count++;
+						}
+						scalePiece(start, count);
+					} else if(playerSelectedStone[currentPlayer] == RECTANGLE_STONE) {
+
+					} else {
+
+					}
+				}
+			}
 			canvas.removeEventListener('click', putStoneState);
 			return;
 		} else {
