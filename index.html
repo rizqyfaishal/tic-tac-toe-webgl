@@ -36,23 +36,12 @@
 	</div>
 	<script src="js/jquery-3.3.1.min.js"></script>
 	<script type="text/javascript" src="js/bootstrap.bundle.min.js"></script>
-	<script id="vertex-shader" type="x-shader/x-vertex">
-      attribute vec4 vPosition;
-      attribute vec4 vColor;
-      attribute float vSize;
-      
-      varying vec4 fColor;
-      
-      void
-      main()
-      {
-          gl_Position = vPosition;
-          gl_PointSize = vSize;
-          fColor = vColor;
-      }
-   </script>
-   <script id="vertex-shader" type="x-shader/x-vertex">
+   	<script id="vertex-shader" type="x-shader/x-vertex">
 		attribute vec2 vPosition;
+	    attribute vec4 vColor;
+	    attribute float vSize;
+	      
+	    varying vec4 fColor;
 
 		uniform mat3 u_matrix;
 
@@ -61,19 +50,23 @@
 		main()
 		{
 		  // Multiply the position by the matrix.
+		  // gl_Position = vec4((u_matrix * vec3(vPosition, 1)).xy, 0, 1);
 		  gl_Position = vec4((u_matrix * vec3(vPosition, 1)).xy, 0, 1);
-
+		  gl_PointSize = vSize;
+          fColor = vColor;
 		}
 
-	</script>
+		</script>
 
 	<script id="fragment-shader" type="x-shader/x-fragment">
 		precision mediump float;
+		uniform vec4 u_color;
+
 
 		void
 		main()
 		{
-		    gl_FragColor = vec4( 1.0, 1.0, 0.0, 1.0 );
+		    gl_FragColor = u_color;
 		}
 	</script>
 	<script type="text/javascript" src="Common/webgl-utils.js"></script>

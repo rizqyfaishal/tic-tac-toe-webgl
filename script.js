@@ -1,9 +1,10 @@
 "use-strict";
-
+// Global Variable
 var canvas;
 var gl;
 var maxNumVertices = 20000;
 // var index = 0;
+// State untuk game, jika 0 adalah pemain 1 dan kalo 1 adalah pemain 2
 var stateOfGames = [-1, -1 ,-1, -1, -1, -1, -1, -1, -1];
 var player3Stones = [false, false];
 var playerCountStep = [0, 0];
@@ -17,60 +18,187 @@ var moveClickedCount = 0;
 var stateIndexTemp = -1;
 var currentPlayer = PLAYER_1;
 
+// Beberapa variable untuk menghandle animasi, dan mengatur attribut 
+// canvas
+
+var translation = [300, 250]
 var canvasWidth;
 var canvasHeight;
 
+// Jenis piece
 var RECTANGLE_STONE = 0;
 var CIRCLE_STONE = 1;
 var TRIANGLE_STONE = 2;
 var currentSelectedStone = -1;
 
+// Buffer untuk vertex, color, dan point size
 var cBufferId, bufferId, sizeBufferId;
 var canvasOffsetTop, canvasOffsetLeft;
 var totalIndex = 0;
+
 var statusDisplay;
+
+// Beberapa Attribute untuk transformasi matrix
 
 var movement = 1;
 var scaleFactor = 0.005;
 var currentScale = 0.005;
 var currentPosition = 0;
 var targetPosition = 0;
+var translateFactor = 0.01;
 var scale = [1.0, 1.0];
-
+var angle = 0.0;
+var renderAnimateLoadingId;
 var matrixLocation;
+var colorUniformLocation;
 
-function scalePiece(start, count) {
-	currentScale += scaleFactor;
-	if(currentScale > 1.5) {
-		currentScale = 1.5;
-		scaleFactor = -1*scaleFactor;
+// Merupakan fungsi yang memberikan animasi untuk setiap piece ketika menang
+// Jika piece adalah kotak maka akan bergerak ke kanan ke kiri
+// Jika lingkaran maka, akan scale up down
+// Jika segitiga maka, akan bergerak naik turun
+function animatePiece(index) {
+	index = makeSeparatorLine(index);
+	for(var i = 0;i<stateOfGames.length;i++) {
+		var x;
+		var y;
+		radius = 0.4;
+		x = -0.5 - 0.2 + (i%3)*0.5 + (i % 3)*0.2;
+		if(i>=0 && i<=2) {
+			y = 0.5 + 0.2;
+		} else if(i >= 3 && i <= 5) {
+			y = 0;
+		} else {
+			y = -0.5 - 0.2;
+		}
+		var otherplayer;
+		if(currentPlayer == PLAYER_1) {
+			otherplayer = PLAYER_2;
+		} else {
+			otherplayer = PLAYER_1;
+		}
+		angle += 1.0;
+		if(stateOfGames[i] == currentPlayer) {
+			var stone = playerSelectedStone[currentPlayer];
+			var type;
+			var count;
+			currentPosition += translateFactor;
+			if(currentPosition > 0.12) {
+				currentPosition = 0.12;
+				translateFactor = -1*translateFactor;
+			}
+			if(currentPosition < -0.12) {
+				currentPosition = -0.12;
+				translateFactor = -1*translateFactor;
+			}
+			if(stone == RECTANGLE_STONE) {
+				var start = index;
+				// gl.clear(gl.COLOR_BUFFER_BIT);
+				var vertices = [
+					vec2(x-0.5*radius, y-0.5*radius),
+					vec2(x-0.5*radius, y+0.5*radius),
+					vec2(x+0.5*radius, y-0.5*radius),
+					vec2(x+0.5*radius, y+0.5*radius),
+				];
+				console.log(x);
+				for(var j = 0;j<vertices.length;j++) {
+					gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+					gl.bufferSubData(gl.ARRAY_BUFFER, index*8.0, flatten(vertices[j]));
+					index++;
+				}
+				var matrix = m3.identity();
+				var translationMatrix = m3.translation(currentPosition, 0);
+				matrix = m3.multiply(matrix, translationMatrix);
+				gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+				gl.uniformMatrix3fv(matrixLocation, false, matrix);
+				gl.drawArrays(gl.TRIANGLE_STRIP, start, 4);
+
+			} else if(stone == CIRCLE_STONE) {
+				count = 1000;
+				type = gl.TRIANGLE_FAN;
+				var start = index;
+				radius = radius * 0.5;
+				// gl.clear(gl.COLOR_BUFFER_BIT);
+				var points = [];
+				var numPoints = 1000;
+				currentScale += scaleFactor;
+				if(currentScale > 0.3) {
+					currentScale = 0.3;
+					scaleFactor = -1*scaleFactor;
+				}
+				if(currentScale < 0.05) {
+					currentScale = 0.05;
+					scaleFactor = -1*scaleFactor;
+				}
+				var matrix = m3.identity();
+				var scaleMatrix = m3.scaling(scale[0] + currentScale, scale[1] + currentScale);
+				matrix = m3.multiply(matrix, scaleMatrix);
+				gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+				gl.uniformMatrix3fv(matrixLocation, false, matrix);
+				for (var j = 0; j < numPoints; j++){
+				    points.push(vec2(x +
+				        radius*Math.cos(j*2*Math.PI/numPoints),
+				        y + radius*Math.sin(j*2*Math.PI/numPoints) 
+				    ));
+				}
+
+				for(var j = 0;j<points.length;j++) {
+					gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+					gl.bufferSubData(gl.ARRAY_BUFFER, index*8.0, flatten(points[j]));
+					index++;
+				}
+				gl.drawArrays( type, start, count);
+			} else {
+				type = gl.TRIANGLES;
+				var start = index;
+				// gl.clear(gl.COLOR_BUFFER_BIT);
+				var vertices = [
+					vec2(x, y + 0.5*radius),
+					vec2(x - 0.5*radius, y-0.5*radius),
+					vec2(x, y-0.5*radius),
+
+					vec2(x, y + 0.5*radius),
+					vec2(x + 0.5*radius, y-0.5*radius),
+					vec2(x, y-0.5*radius)
+				];
+
+				for(var j = 0; j< vertices.length;j++) {
+					gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+					gl.bufferSubData(gl.ARRAY_BUFFER, index*8.0, flatten(vertices[j]));
+					index++;
+				}	
+				for(var j = 0; j < vertices.length; j+=3) {
+					var matrix = m3.identity();
+					var translationMatrix = m3.translation(0, currentPosition);
+					matrix = m3.multiply(matrix, translationMatrix);
+					gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+					gl.uniformMatrix3fv(matrixLocation, false, matrix);
+					gl.drawArrays(gl.TRIANGLES, start + j, 3);
+				}
+
+			}
+		} else if (stateOfGames[i] == otherplayer) {
+			// Bagian ini untuk merender object yang tidak memerlukan animasi
+			// jadi hanya dikenai transformasi matrix indentity
+			var stone = playerSelectedStone[otherplayer];
+			if(stone == RECTANGLE_STONE) {
+				index = makeRectangle(x, y, 0.4, index);
+			} else if(stone == CIRCLE_STONE) {
+				index = makeCircle(x, y, 0.4, index);
+			} else {
+				index = makeTriangle(x, y, 0.4, index);
+			}
+		}
 	}
-	if(currentScale < 0.05) {
-		currentScale = 0.05;
-		scaleFactor = -1*scaleFactor;
-	}
-	var matrix = m3.identity();
-	var projectionMatrix = m3.projection(canvas.width, canvas.height);
-	var scaleMatrix = m3.scaling(scale[0] + currentScale, scale[1] + currentScale);
-	matrix = m3.multiply(matrix, projectionMatrix);
-	matrix = m3.multiply(matrix, scaleMatrix);
-
-	gl.uniformMatrix3fv(matrixLocation, false, matrix);
-	gl.drawArrays( gl.TRIANGLES, start, count );
-	requestAnimationFrame(scalePiece);
 }
 
-function rotatePiece() {
-	requestAnimation(rotatePiece);
+// fungsi untuk animasi setelah menang
+function renderAnimate() {
+	animatePiece(0);
+	requestAnimationFrame(renderAnimate);
 }
-
-
-function translatePiece(x, y, count) {
-	var matrix = m3.identity();
-
-	requestAnimation(translatePiece);
-}
-
+ 
+// Beberapa fungsi untuk operasi-operasi transformasi matrix
+// Diambil dari contoh code
 var m3 = { 						//setup 3x3 transformation matrix object
    identity: function() {
     return [
@@ -148,10 +276,14 @@ var m3 = { 						//setup 3x3 transformation matrix object
   },
 };
 
+// Fungsi untuk mengecek apakah pemain sudah meletakkan batu dengan
+// jumlah 3
 function getPlayer3Stones (PLAYER_NUM) {
 	return player3Stones[PLAYER_NUM];
 }
 
+// Fungsi untuk mengecek apakah ada pemain dengan langkah terakhir
+// akan meraih kemenangan dalam game
 function checkWinner(lastPlayer) {
 	var PLAYER_NUM = lastPlayer;
 	var lastStep = playerLastStep[PLAYER_NUM][1];
@@ -173,10 +305,8 @@ function checkWinner(lastPlayer) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep+3] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+6]);
 		} else if([3, 4, 5].indexOf(lastStep) != -1) {
-			console.log(lastStep);
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-3] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep+3]);
-			console.log(isWin);
 		} else {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-3] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep-6]);
@@ -200,11 +330,13 @@ function checkWinner(lastPlayer) {
 			isWin = isWin || (stateOfGames[lastStep] == stateOfGames[lastStep-4] 
 				&& stateOfGames[lastStep] == stateOfGames[lastStep-8]);
 		}
-		console.log(isWin);
 		return isWin;
 	}
 }
 
+// Jika pemain sudah meletakkan batu berjumlah tiga
+// kemungkinan langkah yang dapat diambil adalah memindahkan dari satu
+// kotak dengan tempat lain yang berdekatan / bersisihan.
 function moveStone(from, to, PLAYER_NUM) {
 	var validMove;
 	if(stateOfGames[from] == -1 || stateOfGames[to] != -1) {
@@ -248,6 +380,7 @@ function moveStone(from, to, PLAYER_NUM) {
 	
 }
 
+// Jika batu yang diletakkan kurang dari 3, maka tidak boleh melakukan pemindahan batu
 function putStone(to, PLAYER_NUM) {
 	if(stateOfGames[to] != -1) {
 		alert("Tidak valid");
@@ -264,7 +397,7 @@ function putStone(to, PLAYER_NUM) {
 	
 }
 
-
+// Fungsi yang di jalankan ketika semua objek dalam dokumen sudah di muat semuanya
 window.onload = function() {
 
 	statusDisplay = $('h2#statusDisplay');
@@ -285,7 +418,8 @@ window.onload = function() {
 		$('#step-3').css({ 'display': 'none' });
 		$('#canvas-container').css({ 'display': 'block' });
 		$('#prelude').css({ 'display': 'none' });
-		startPlayingGame();
+		setTimeout(startPlayingGame, 3000);
+		renderAnimateLoading();
 	})
 	canvas = document.getElementById('gl-canvas');
 	gl = WebGLUtils.setupWebGL(canvas);
@@ -297,6 +431,7 @@ window.onload = function() {
 	gl.viewport(0, 0, canvas.width, canvas.height);
 	gl.clearColor(0.0, 0.0, 0.0, 1.0);
 
+	// Beberapa inisisasi konfigurasi mengatur canvas dan GL
 	var program = initShaders( gl, "vertex-shader", "fragment-shader" );
 	gl.useProgram( program );
 
@@ -309,7 +444,7 @@ window.onload = function() {
     gl.enableVertexAttribArray( vPos );
 
     matrixLocation = gl.getUniformLocation(program, "u_matrix");
-
+    colorUniformLocation = gl.getUniformLocation(program, "u_color");
 
     cBufferId = gl.createBuffer();
     gl.bindBuffer( gl.ARRAY_BUFFER, cBufferId );
@@ -332,7 +467,42 @@ window.onload = function() {
 	
 }
 
+// Fungsi yang menampilkan kotak berputar sebelum memilih piece
+// Dummy loading
+function animateLoading(x, y, index) {
+	angle += 1.0;
+	var radius = 0.4;
+	var angleInRadians = (angle * Math.PI/180); //rotating counter clockwise
+
+	var start = 0;
+	var vertices = [
+		vec2(x-0.5*radius, y-0.5*radius),
+		vec2(x-0.5*radius, y+0.5*radius),
+		vec2(x+0.5*radius, y-0.5*radius),
+		vec2(x+0.5*radius, y+0.5*radius),
+	];
+	for(var i = 0;i<vertices.length;i++) {
+		gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
+		gl.bufferSubData(gl.ARRAY_BUFFER, index*8.0, flatten(vertices[i]));
+		index++;
+	}
+	var matrix = m3.identity();
+	var rotationMatrix = m3.rotation(angleInRadians);
+	matrix = m3.multiply(matrix, rotationMatrix);
+	gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+	gl.uniformMatrix3fv(matrixLocation, false, matrix);
+	gl.drawArrays(gl.TRIANGLE_STRIP, start, 4);
+}
+
+// Fungsi akan dipanggil terus menerus
+function renderAnimateLoading() {
+	animateLoading(0,0,0);
+	renderAnimateLoadingId = requestAnimationFrame(renderAnimateLoading);
+}
+
+// Jika kedua pemain selesai memasukkan nama, maka permainan dimulai
 function startPlayingGame() {
+	window.cancelAnimationFrame(renderAnimateLoadingId);
 	showChoicesStone(0);
 	$(statusDisplay).html('('+ playerNames[PLAYER_1] + ') Pilih Bentuk Bidak');
 	canvas.addEventListener('click', onSelectStoneForPlayer1);
@@ -361,6 +531,8 @@ function startPlayingGame() {
 	});
 }
 
+// Menentukan posisi index dalam array jika diberikan koordinat mousepoint dalam canvas
+// mmengembalikan nila antara 0-2, dan akan dikombinasikan dengan fngsi di bawah
 function getIndexStateX(x) {
 	if(x >= -1 && x <= -0.4) {
 		return 0;
@@ -371,6 +543,7 @@ function getIndexStateX(x) {
 	}
 }
 
+// Mengembalikan nilai index kotak dalam array jika diberikkan koordinat mouse point X, dan Y
 function getIndexStateOfGame(x, y) {
 	var xTemp = getIndexStateX(x);
 	if(y <= -0.38 && y >= -1) {
@@ -382,6 +555,8 @@ function getIndexStateOfGame(x, y) {
 	}
 }
 
+// Fungsi yang memvalidasi langakah move sebelum di lanjutkan ke fungsi moveStone, yang
+// langsung beroperasi pada array stateOfGame
 function moveStoneState(event) {
 	var mousePoint  = vec2(((event.clientX - canvasOffsetLeft) / canvasWidth - 0.5)*2, 
 		((event.clientY - canvasOffsetTop) / canvasHeight-0.5)*2);
@@ -400,6 +575,7 @@ function moveStoneState(event) {
 			if(checkWinner(currentPlayer)) {
 				$(statusDisplay).html(playerNames[currentPlayer] + ' Menang!!!');
 				canvas.removeEventListener('click', moveStoneState);
+				renderAnimate();
 				return;
 			}
 			moveClickedCount = 0;
@@ -417,57 +593,19 @@ function moveStoneState(event) {
 
 }
 
+// Meyhod yang memvalidasi input klik sebelum diteruskan ke fungsi putStone
 function putStoneState(event) {
 	var mousePoint  = vec2(((event.clientX - canvasOffsetLeft) / canvasWidth - 0.5)*2, 
 		((event.clientY - canvasOffsetTop) / canvasHeight-0.5)*2);
 	var stateIndex = getIndexStateOfGame(mousePoint[0], mousePoint[1]);
 	var temp = putStone(stateIndex, currentPlayer);
 	if(temp) {
-		var total = renderStateOfGame(0);
-		var start = total;
+		renderStateOfGame(0);
 		if(checkWinner(currentPlayer)) {
 			$(statusDisplay).html(playerNames[currentPlayer] + ' Menang!!!');
-			for(var i = 0;i<stateOfGames.length;i++) {
-				if(stateOfGames[i] == currentPlayer) {
-					if(playerSelectedStone[currentPlayer] == CIRCLE_STONE) {
-						var x;
-						var y;
-						x = -0.5 - 0.2 + (i%3)*0.5 + (i % 3)*0.2;
-						if(i>=0 && i<=2) {
-							y = 0.5 + 0.2;
-						} else if(i >= 3 && i <= 5) {
-							y = 0;
-						} else {
-							y = -0.5 - 0.2;
-						}
-						var count = 0;
-						var radius = 0.4;
-						radius = radius * 0.5;
-						// gl.clear(gl.COLOR_BUFFER_BIT);
-						var points = [];
-						var numPoints = 1000;
-						for (var i = 0; i < numPoints; i++){
-						    points.push(vec2(x +
-						        radius*Math.cos(i*2*Math.PI/numPoints),
-						        y + radius*Math.sin(i*2*Math.PI/numPoints) 
-						    ));
-						}
-
-						for(var i = 0;i<points.length;i++) {
-							gl.bindBuffer(gl.ARRAY_BUFFER, bufferId);
-							gl.bufferSubData(gl.ARRAY_BUFFER, total*8.0, flatten(points[i]));
-							total++;
-							count++;
-						}
-						scalePiece(start, count);
-					} else if(playerSelectedStone[currentPlayer] == RECTANGLE_STONE) {
-
-					} else {
-
-					}
-				}
-			}
+			renderAnimate();
 			canvas.removeEventListener('click', putStoneState);
+			canvas.removeEventListener('click', moveStoneState);
 			return;
 		} else {
 			if(currentPlayer == PLAYER_1) {
@@ -486,6 +624,7 @@ function putStoneState(event) {
 	
 }	
 
+// Fungsi callback ketika pemain 2 sudah memilih piece / batu
 function onSelectStoneForPlayer2(event) {
 	var mousePoint  = vec2(((event.clientX - canvasOffsetLeft) / canvasWidth - 0.5)*2, 
 		((event.clientY - canvasOffsetTop) / canvasHeight-0.5)*2);
@@ -518,6 +657,7 @@ function onSelectStoneForPlayer2(event) {
 	totalIndex = index;
 }
 
+// Fungsi callback ketika pemain 1 sudah memilih piece / batu
 function onSelectStoneForPlayer1(event) {
 	var mousePoint  = vec2(((event.clientX - canvasOffsetLeft) / canvasWidth - 0.5)*2, 
 		((event.clientY - canvasOffsetTop) / canvasHeight-0.5)*2);
@@ -548,6 +688,7 @@ function onSelectStoneForPlayer1(event) {
 	totalIndex = index;
 }
 
+// Memberikan outline garis ke piece yang di klik oleh pemain
 function makeBoundaryLine(x, y, radius, index) {
 	var start = index;
 	var vertices = [
@@ -574,6 +715,8 @@ function makeBoundaryLine(x, y, radius, index) {
 	return index;
 }
 
+
+// Fungsi untuk membuat bentuk segitiga pada suatu koordinat x, y dan radius tertentu
 function makeTriangle(x, y, radius, index) {
 	var start = index;
 	// gl.clear(gl.COLOR_BUFFER_BIT);
@@ -594,12 +737,16 @@ function makeTriangle(x, y, radius, index) {
 	}
 
 	for(var i = 0; i < vertices.length; i+=3) {
+		var matrix = m3.identity();
+		gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+		gl.uniformMatrix3fv(matrixLocation, false, matrix);
 		gl.drawArrays(gl.TRIANGLES, start + i, 3);
 	}
 
 	return index;
 }
 
+// Fungsi untuk membuat bentuk segi empat pada suatu koordinat x, y dan radius tertentu
 function makeRectangle(x, y, radius, index) {
 	var start = index;
 	// gl.clear(gl.COLOR_BUFFER_BIT);
@@ -616,11 +763,15 @@ function makeRectangle(x, y, radius, index) {
 		gl.bufferSubData(gl.ARRAY_BUFFER, index*8.0, flatten(vertices[i]));
 		index++;
 	}
+	var matrix = m3.identity();
+	gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+	gl.uniformMatrix3fv(matrixLocation, false, matrix);
 	gl.drawArrays(gl.TRIANGLE_STRIP, start, 4);
 	return index;
 
 }
 
+// Fungsi untuk membuat bentuk lingkaran pada suatu koordinat x, y dan radius tertentu
 function makeCircle(x, y, radius, index) {
 	var start = index;
 	radius = radius * 0.5;
@@ -639,11 +790,14 @@ function makeCircle(x, y, radius, index) {
 		gl.bufferSubData(gl.ARRAY_BUFFER, index*8.0, flatten(points[i]));
 		index++;
 	}
-	
+	var matrix = m3.identity();
+	gl.uniform4f(colorUniformLocation, 0, 1, 0, 1);
+	gl.uniformMatrix3fv(matrixLocation, false, matrix);
 	gl.drawArrays(gl.TRIANGLE_FAN, start, numPoints);
 	return index;
 }
 
+// Menampilkan pilihan piece untuk pemain
 function showChoicesStone(index) {
 	var start = 0;
 	gl.clear(gl.COLOR_BUFFER_BIT);
@@ -669,6 +823,8 @@ function showChoicesStone(index) {
 
 }
 
+// Merender state dari game, untuk setiap putStone, dan moveStone akan memanggil fungsi ini
+// untuk mengupdate tampilan dari state of game
 function renderStateOfGame(index) {
 	var start = index;
 	index = makeSeparatorLine(index);
@@ -706,6 +862,7 @@ function renderStateOfGame(index) {
 	return index;
 }
 
+// Fungsi untuk membuat separator line (grid)
 function makeSeparatorLine(index) {
 	var start = index;
 	var lineWidth = 0.03;
@@ -752,8 +909,9 @@ function makeSeparatorLine(index) {
 	    index++;
     }
 
-    
+    matrix = m3.identity();
    	for(var i = 0;i<index;i+=4) {
+   		gl.uniformMatrix3fv(matrixLocation, false, matrix);
    		gl.drawArrays(gl.TRIANGLE_STRIP, start+i, 4);
    	}
 
